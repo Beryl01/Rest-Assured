@@ -1,0 +1,40 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
+*.releaseBackup
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+*.iws
+*.ipr
+
+# Build
+build/
+dist/
+*.class
+
+# Test reports
+test-output/
+reports/
+surefire-reports/
+
+# Other
+.classpath
+.project
+.settings/
+bin/
+out/
+*.log
+.env

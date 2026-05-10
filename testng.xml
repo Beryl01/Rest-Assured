@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="API Test Suite" parallel="false">
+    <test name="Rest Assured Concepts Test">
+        <classes>
+            <class name="com.qa.api.tests.RestAssuredConceptsGuide" />
+        </classes>
+    </test>
+
+    <test name="Basic Supplier API Tests">
+        <classes>
+            <class name="com.qa.api.tests.BasicSupplierApiTest" />
+        </classes>
+    </test>
+
+    <test name="Supplier CRUD Tests (Chained)">
+        <classes>
+            <class name="com.qa.api.tests.SupplierCRUDTest" />
+        </classes>
+    </test>
+</suite>

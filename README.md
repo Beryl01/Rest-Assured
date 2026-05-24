@@ -369,5 +369,3 @@ mvn -version
 - [Jenkins Pipeline Guide](https://www.jenkins.io/doc/book/pipeline/)
 
 ---
-
-**Summary:** This is a API testing framework using Rest Assured with TestNG with Java 17. Tests run locally in VS Code, or automatically on Jenkins via CI/CD — no GUI needed. The same code works everywhere because it's pure Java.

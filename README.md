@@ -2,16 +2,6 @@
 
 A complete API testing framework using **Rest Assured** and **TestNG** with Java 17 LTS. This project demonstrates how to write API tests in code and execute them both locally and on Jenkins CI/CD.
 
-## Table of Contents
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Setup Instructions](#setup-instructions)
-- [Running Tests](#running-tests)
-- [File Guide](#file-guide)
-- [Postman → Rest Assured Mapping](#postman--rest-assured-mapping)
-- [Jenkins Setup](#jenkins-setup)
-
 ## Quick Start
 
 ### Local Setup (5 minutes)
@@ -37,23 +27,6 @@ mvn test
 # 2. Create a Pipeline job in Jenkins
 # 3. Set repository URL and point to Jenkinsfile
 # 4. Jenkins automatically downloads Java 17 & Maven, runs tests
-```
-
-## Project Structure
-
-```
-rest-assured-tests/
-├── pom.xml                                    # Maven config + dependencies
-├── Jenkinsfile                                # CI/CD pipeline for Jenkins
-├── testng.xml                                 # Test suite configuration
-├── README.md                                  # This file
-├── src/
-│   └── test/
-│       ├── java/
-│       │   ├── RestAssuredConceptsGuide.java  # Complete syntax reference
-│       │   ├── BasicSupplierApiTest.java      # Simple GET/POST/PUT/DELETE
-│       │   └── SupplierCRUDTest.java          # Chained tests with state
-│       └── resources/                         # Test data, config files
 ```
 
 ## Prerequisites
@@ -164,56 +137,6 @@ Maven configuration file with:
 - **Gson** 2.10.1 - JSON parsing
 - **Maven Surefire** - Test execution plugin
 
-### RestAssuredConceptsGuide.java
-**Complete syntax reference** mapping Postman concepts to Rest Assured:
-
-| Postman | Rest Assured |
-|---------|--------------|
-| Set base URL | `RestAssured.baseURI = "..."` |
-| Headers tab | `.header("Key", "Value")` |
-| Body tab | `.body("{ ... }")` |
-| Send GET | `.when().get("/path")` |
-| Tests - status | `.then().statusCode(200)` |
-| Extract value | `.extract().response().jsonPath().getString("field")` |
-| Environment var | Java class variable |
-| Collection run | `@Test(priority=N, dependsOnMethods="...")` |
-
-### BasicSupplierApiTest.java
-Demonstrates **independent** tests:
-```java
-✓ GET /suppliers                    - Fetch all suppliers
-✓ GET /suppliers/{id}               - Fetch specific supplier
-✓ POST /suppliers                   - Create supplier
-✓ PUT /suppliers/{id}               - Update supplier
-✓ PATCH /suppliers/{id}             - Partial update
-✓ DELETE /suppliers/{id}            - Delete supplier
-✓ Verify deleted returns 404         - Confirm deletion
-```
-
-### SupplierCRUDTest.java
-Demonstrates **chained** tests with state:
-
-```
-Test 1: Authenticate
-  ├─ POST /auth/login
-  └─ Extract token → store in authToken variable
-
-Test 2: Create (depends on Test 1)
-  ├─ POST /suppliers (with authToken)
-  └─ Extract ID → store in supplierId variable
-
-Test 3: Update (depends on Test 2)
-  └─ PUT /suppliers/{supplierId}
-
-Test 4: Get (depends on Test 2)
-  └─ GET /suppliers/{supplierId}
-
-Test 5: Delete (depends on Test 2 & 3)
-  └─ DELETE /suppliers/{supplierId}
-
-Test 6: Verify 404 (depends on Test 5)
-  └─ GET /suppliers/{supplierId} → expect 404
-```
 
 **Key Advantage:** If Test 1 fails, tests 2-6 are automatically **skipped** — no cascading failures.
 
@@ -447,4 +370,4 @@ mvn -version
 
 ---
 
-**Summary:** This is a production-ready API testing framework using Rest Assured + TestNG with Java 17. Tests run locally in VS Code, or automatically on Jenkins via CI/CD — no GUI needed. The same code works everywhere because it's pure Java.
+**Summary:** This is a API testing framework using Rest Assured with TestNG with Java 17. Tests run locally in VS Code, or automatically on Jenkins via CI/CD — no GUI needed. The same code works everywhere because it's pure Java.

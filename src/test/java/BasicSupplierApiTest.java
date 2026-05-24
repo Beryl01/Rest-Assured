@@ -11,17 +11,18 @@ import static org.testng.Assert.*;
 
 /**
  * Basic Supplier API Tests
- * 
- * Demonstrates simple GET, POST, PUT, DELETE operations
- * without state chaining (simpler than CRUD test with dependencies).
+ *
+ * Standalone CRUD tests - each one is independent and doesn't rely on state
+ * from the others. Good starting point before moving to SupplierCRUDTest
+ * which chains them together with token extraction and ID passing.
  */
 public class BasicSupplierApiTest {
 
-    private String baseURL = "https://api.example.com";  // Change to your actual API
+    // Swap this for your actual API base URL before running
+    private String baseURL = "https://api.example.com";
 
     @BeforeClass
     public void setup() {
-        // Set base URL for all requests in this class
         RestAssured.baseURI = baseURL;
         RestAssured.basePath = "/api/v1";
     }
@@ -41,7 +42,7 @@ public class BasicSupplierApiTest {
     @Test(description = "Verify GET /suppliers/{id} returns supplier details")
     public void test_get_supplier_by_id() {
         int supplierId = 1;
-        
+
         given()
                 .pathParam("id", supplierId)
         .when()
@@ -50,7 +51,8 @@ public class BasicSupplierApiTest {
                 .statusCode(200)
                 .body("id", equalTo(supplierId))
                 .body("name", notNullValue())
-                .body("email", matchesPattern("^[A-Za-z0-9+_.-]+@(.+)$"))  // Email regex
+                // Simple email pattern check - just confirms the field looks like an address
+                .body("email", matchesPattern("^[A-Za-z0-9+_.-]+@(.+)$"))
                 .log().all();
     }
 
@@ -69,13 +71,12 @@ public class BasicSupplierApiTest {
         .when()
                 .post("/suppliers")
         .then()
-                .statusCode(201)  // Created
-                .body("id", notNullValue())
+                .statusCode(201)
+                .body("id", notNullValue())   // server should assign an ID on creation
                 .body("name", equalTo("Acme Corp"))
                 .extract()
                 .response();
 
-        // Extract ID for potential use in subsequent requests
         Integer supplierId = response.jsonPath().getInt("id");
         System.out.println("Created supplier with ID: " + supplierId);
     }
@@ -83,7 +84,7 @@ public class BasicSupplierApiTest {
     @Test(description = "Update supplier with PUT")
     public void test_update_supplier() {
         int supplierId = 1;
-        
+
         String updateBody = "{\n" +
                 "  \"name\": \"Acme Corp Updated\",\n" +
                 "  \"email\": \"newemail@acmecorp.com\",\n" +
@@ -106,7 +107,8 @@ public class BasicSupplierApiTest {
     @Test(description = "Partial update supplier with PATCH")
     public void test_patch_supplier() {
         int supplierId = 1;
-        
+
+        // PATCH only sends the fields that need to change - everything else stays as-is
         String patchBody = "{\n" +
                 "  \"email\": \"patched@acmecorp.com\"\n" +
                 "}";
@@ -126,20 +128,22 @@ public class BasicSupplierApiTest {
     @Test(description = "Delete supplier with DELETE")
     public void test_delete_supplier() {
         int supplierId = 1;
-        
+
         given()
                 .pathParam("id", supplierId)
         .when()
                 .delete("/suppliers/{id}")
         .then()
-                .statusCode(204)  // No Content
+                .statusCode(204)  // 204 No Content - success, nothing to return
                 .log().all();
     }
 
     @Test(description = "Verify deleted supplier returns 404")
     public void test_get_deleted_supplier_returns_404() {
         int deletedSupplierId = 1;
-        
+
+        // This should run after test_delete_supplier - confirms the record is
+        // actually gone and not just returning stale cached data
         given()
                 .pathParam("id", deletedSupplierId)
         .when()
@@ -159,7 +163,7 @@ public class BasicSupplierApiTest {
                 .get("/suppliers")
         .then()
                 .statusCode(200)
-                .body("$", notNullValue())
+                .body("$", notNullValue())  // at minimum the response body should exist
                 .log().all();
     }
 
@@ -171,18 +175,20 @@ public class BasicSupplierApiTest {
         .then()
                 .statusCode(200)
                 .header("Content-Type", containsString("application/json"))
+                // X-Total-Count is useful for pagination - verify the API sends it
                 .header("X-Total-Count", notNullValue())
                 .log().all();
     }
 
     @Test(description = "Verify request/response logging")
     public void test_with_detailed_logging() {
+        // Useful when debugging - logs both the outgoing request and incoming response
         given()
-                .log().all()  // Log request details
+                .log().all()
         .when()
                 .get("/suppliers")
         .then()
-                .log().all()  // Log response details
+                .log().all()
                 .statusCode(200);
     }
 

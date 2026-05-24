@@ -9,25 +9,23 @@ import static io.restassured.RestAssured.*;
 import static org.hamcrest.Matchers.*;
 
 /**
- * Supplier CRUD Tests with State Chaining
- * 
- * Demonstrates the Postman collection run concept:
- * Test 1: Authenticate (POST /auth) → extract token → store in class variable
- * Test 2: Create supplier (POST /suppliers) → extract ID → store in class variable
- * Test 3: Update supplier (PUT /suppliers/{id}) → uses ID from Test 2
- * Test 4: Get supplier (GET /suppliers/{id}) → uses ID from Test 2
- * Test 5: Delete supplier (DELETE /suppliers/{id}) → uses ID from Test 2
- * 
- * Key concepts:
- * - @Test(priority = N) controls execution order
- * - dependsOnMethods = "previous_test" skips this test if dependency fails
- * - Class variables store state (like Postman environment variables)
+ * Supplier CRUD Tests - chained flow with state passing between steps.
+ *
+ * Same idea as a Postman collection run: authenticate first, grab the token,
+ * pass it into every call after that. The supplier ID from step 2 gets
+ * reused by steps 3-6, same way you'd store it in a Postman env variable.
+ *
+ * @Test(priority) controls order. dependsOnMethods skips a test automatically
+ * if its parent fails - so one broken step doesn't produce a wall of
+ * cascading failures below it.
+ *
+ * Flow: auth -> create -> update + get -> delete -> verify 404
  */
 public class SupplierCRUDTest {
 
     private String baseURL = "https://api.example.com";
-    
-    // Class variables to store state between tests (like Postman environment variables)
+
+    // acts like a Postman environment variable - set once, reused across tests
     private static String authToken;
     private static Integer supplierId;
     private static String supplierName = "Test Supplier Corp";
@@ -38,10 +36,7 @@ public class SupplierCRUDTest {
         RestAssured.basePath = "/api/v1";
     }
 
-    /**
-     * Test 1: Authenticate and extract token
-     * This is the foundation - all other tests depend on this.
-     */
+    // step 1 - everything else in this suite needs a valid token
     @Test(priority = 1, description = "Step 1: Authenticate and extract token")
     public void test_01_authenticate() {
         String authBody = "{\n" +
@@ -60,16 +55,13 @@ public class SupplierCRUDTest {
                 .extract()
                 .response();
 
-        // Extract token and store in class variable (like pm.environment.set("token", ...))
+        // pull the token out and store it - same as pm.environment.set("token", ...)
         authToken = response.jsonPath().getString("token");
         System.out.println("✓ Test 1 PASSED: Token extracted - " + authToken);
     }
 
-    /**
-     * Test 2: Create a supplier using the authenticated token
-     * Depends on Test 1 (auth) to have a valid token
-     */
-    @Test(priority = 2, dependsOnMethods = {"test_01_authenticate"}, 
+    // step 2 - create the supplier record that all later steps will operate on
+    @Test(priority = 2, dependsOnMethods = {"test_01_authenticate"},
           description = "Step 2: Create supplier - requires auth token")
     public void test_02_create_supplier() {
         String createBody = "{\n" +
@@ -80,28 +72,25 @@ public class SupplierCRUDTest {
                 "}";
 
         Response response = given()
-                .header("Authorization", "Bearer " + authToken)  // Use token from Test 1
+                .header("Authorization", "Bearer " + authToken)  // token from step 1
                 .header("Content-Type", "application/json")
                 .body(createBody)
         .when()
                 .post("/suppliers")
         .then()
-                .statusCode(201)
+                .statusCode(201)  // 201 Created - not 200, the server made a new resource
                 .body("id", notNullValue())
                 .body("name", equalTo(supplierName))
                 .extract()
                 .response();
 
-        // Extract supplier ID and store in class variable
+        // hold onto this ID - steps 3, 4, 5 and 6 all need it
         supplierId = response.jsonPath().getInt("id");
         System.out.println("✓ Test 2 PASSED: Supplier created with ID - " + supplierId);
     }
 
-    /**
-     * Test 3: Update the supplier
-     * Depends on Test 2 (create) to have a valid supplier ID
-     */
-    @Test(priority = 3, dependsOnMethods = {"test_02_create_supplier"}, 
+    // step 3 - PUT replaces the full resource, so we send name, email and phone
+    @Test(priority = 3, dependsOnMethods = {"test_02_create_supplier"},
           description = "Step 3: Update supplier - requires supplier ID")
     public void test_03_update_supplier() {
         String updateBody = "{\n" +
@@ -113,12 +102,13 @@ public class SupplierCRUDTest {
         given()
                 .header("Authorization", "Bearer " + authToken)
                 .header("Content-Type", "application/json")
-                .pathParam("id", supplierId)                  // Use ID from Test 2
+                .pathParam("id", supplierId)   // ID from step 2
                 .body(updateBody)
         .when()
                 .put("/suppliers/{id}")
         .then()
                 .statusCode(200)
+                // confirm the fields we sent actually landed
                 .body("name", equalTo(supplierName + " - Updated"))
                 .body("email", equalTo("updated@company.com"))
                 .log().all();
@@ -126,16 +116,13 @@ public class SupplierCRUDTest {
         System.out.println("✓ Test 3 PASSED: Supplier updated successfully");
     }
 
-    /**
-     * Test 4: Retrieve the supplier
-     * Depends on Test 2 (create) to have a valid supplier ID
-     */
-    @Test(priority = 4, dependsOnMethods = {"test_02_create_supplier"}, 
+    // step 4 - GET runs independently of step 3; both only need step 2
+    @Test(priority = 4, dependsOnMethods = {"test_02_create_supplier"},
           description = "Step 4: Get supplier details - requires supplier ID")
     public void test_04_get_supplier() {
         given()
                 .header("Authorization", "Bearer " + authToken)
-                .pathParam("id", supplierId)                  // Use ID from Test 2
+                .pathParam("id", supplierId)
         .when()
                 .get("/suppliers/{id}")
         .then()
@@ -147,40 +134,34 @@ public class SupplierCRUDTest {
         System.out.println("✓ Test 4 PASSED: Supplier retrieved successfully");
     }
 
-    /**
-     * Test 5: Delete the supplier
-     * Depends on Test 2 (create) to have a valid supplier ID
-     * Can also depend on Test 3 to ensure update completed first
-     */
-    @Test(priority = 5, dependsOnMethods = {"test_02_create_supplier", "test_03_update_supplier"}, 
+    // step 5 - waits for step 3 to finish before deleting, avoids a race on the record
+    @Test(priority = 5, dependsOnMethods = {"test_02_create_supplier", "test_03_update_supplier"},
           description = "Step 5: Delete supplier - requires supplier ID")
     public void test_05_delete_supplier() {
         given()
                 .header("Authorization", "Bearer " + authToken)
-                .pathParam("id", supplierId)                  // Use ID from Test 2
+                .pathParam("id", supplierId)
         .when()
                 .delete("/suppliers/{id}")
         .then()
-                .statusCode(204)  // No Content on successful delete
+                .statusCode(204)  // 204 No Content - resource is gone, nothing to return
                 .log().all();
 
         System.out.println("✓ Test 5 PASSED: Supplier deleted successfully");
     }
 
-    /**
-     * Test 6: Verify supplier is deleted (404)
-     * Depends on Test 5 (delete) to ensure deletion completed
-     */
-    @Test(priority = 6, dependsOnMethods = {"test_05_delete_supplier"}, 
+    // step 6 - 404 here means the record is gone, not just hidden
+    // catches soft-delete bugs where GET still returns data after DELETE
+    @Test(priority = 6, dependsOnMethods = {"test_05_delete_supplier"},
           description = "Step 6: Verify deletion - supplier should not exist")
     public void test_06_verify_deletion() {
         given()
                 .header("Authorization", "Bearer " + authToken)
-                .pathParam("id", supplierId)                  // Use ID from Test 2
+                .pathParam("id", supplierId)
         .when()
                 .get("/suppliers/{id}")
         .then()
-                .statusCode(404)  // Not Found
+                .statusCode(404)  // anything other than 404 means delete didn't work
                 .log().all();
 
         System.out.println("✓ Test 6 PASSED: Verified supplier is deleted (404)");
@@ -190,36 +171,27 @@ public class SupplierCRUDTest {
 
 /*
  * EXECUTION FLOW:
- * 
- * Test 1: test_01_authenticate()
- *   ├─ POST /auth/login
- *   ├─ Extract token
- *   └─ Store in authToken (class variable)
  *
- * Test 2: test_02_create_supplier() [depends on Test 1]
- *   ├─ IF Test 1 fails → SKIP Test 2
- *   ├─ POST /suppliers (with authToken)
- *   ├─ Extract ID
- *   └─ Store in supplierId (class variable)
+ * test_01_authenticate()
+ *   POST /auth/login -> extract token -> store in authToken
  *
- * Test 3: test_03_update_supplier() [depends on Test 2]
- *   ├─ IF Test 2 fails → SKIP Test 3
- *   └─ PUT /suppliers/{supplierId}
+ * test_02_create_supplier()  [needs test_01]
+ *   if test_01 fails -> skip
+ *   POST /suppliers with authToken -> extract ID -> store in supplierId
  *
- * Test 4: test_04_get_supplier() [depends on Test 2]
- *   ├─ IF Test 2 fails → SKIP Test 4
- *   └─ GET /suppliers/{supplierId}
+ * test_03_update_supplier()  [needs test_02]
+ *   if test_02 fails -> skip
+ *   PUT /suppliers/{supplierId}
  *
- * Test 5: test_05_delete_supplier() [depends on Test 2 & 3]
- *   ├─ IF Test 2 OR 3 fail → SKIP Test 5
- *   └─ DELETE /suppliers/{supplierId}
+ * test_04_get_supplier()  [needs test_02]
+ *   if test_02 fails -> skip
+ *   GET /suppliers/{supplierId}
  *
- * Test 6: test_06_verify_deletion() [depends on Test 5]
- *   ├─ IF Test 5 fails → SKIP Test 6
- *   └─ GET /suppliers/{supplierId} (should be 404)
- * 
- * KEY ADVANTAGE:
- * If any test fails, dependent tests are automatically skipped.
- * Example: If test_02_create_supplier() fails, tests 3-6 are skipped automatically.
- * This prevents cascading false failures and makes debugging easier.
+ * test_05_delete_supplier()  [needs test_02 + test_03]
+ *   if either fails -> skip
+ *   DELETE /suppliers/{supplierId}
+ *
+ * test_06_verify_deletion()  [needs test_05]
+ *   if test_05 fails -> skip
+ *   GET /suppliers/{supplierId} -> expect 404
  */
